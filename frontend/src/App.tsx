@@ -16,11 +16,13 @@ import { useAuthStore } from './store/authStore'
 import { authService } from './services'
 
 function AuthLoader({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, setAuth, logout } = useAuthStore()
+  const { isAuthenticated, token, _hasHydrated, setAuth, logout } = useAuthStore()
 
   useEffect(() => {
     const refreshUser = async () => {
-      const token = localStorage.getItem('token')
+      // Only verify token after hydration completes and we have auth
+      if (!_hasHydrated) return
+      
       if (token && isAuthenticated) {
         try {
           const response = await authService.me()
@@ -34,7 +36,7 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
       }
     }
     refreshUser()
-  }, [])
+  }, [_hasHydrated, isAuthenticated, token])
 
   return <>{children}</>
 }

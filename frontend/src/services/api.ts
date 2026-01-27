@@ -21,10 +21,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Only clear auth and redirect for explicit 401s on protected endpoints
+    // Don't redirect during initial page load or for public endpoints
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+      const url = error.config?.url || ''
+      // Only redirect if accessing protected endpoints (not login/register/public)
+      const isProtectedEndpoint = url.includes('/auth/me') || 
+        url.includes('/blogs/my') ||
+        url.includes('/dashboard') ||
+        (url.includes('/users') && !url.includes('/blogs'))
+      
+      if (isProtectedEndpoint) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('auth-storage')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

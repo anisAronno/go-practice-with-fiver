@@ -104,8 +104,12 @@ export default function BlogDetailPage() {
 
       <article className="bg-white rounded-xl shadow-sm border overflow-hidden">
         {blog.image && (
-          <div className="h-80 md:h-96 overflow-hidden">
-            <img src={getImageUrl(blog.image)} alt={blog.title} className="w-full h-full object-cover" />
+          <div className="w-full">
+            <img 
+              src={getImageUrl(blog.image)} 
+              alt={blog.title} 
+              className="w-full h-auto max-h-[500px] object-contain bg-gray-100" 
+            />
           </div>
         )}
 
