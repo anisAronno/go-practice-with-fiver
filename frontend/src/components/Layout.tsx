@@ -1,14 +1,18 @@
+import { useState } from 'react'
 import { Outlet, Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { Home, FileText, PlusCircle, LogIn, LogOut, User } from 'lucide-react'
+import { Home, FileText, LogIn, LogOut, LayoutDashboard } from 'lucide-react'
+import LogoutModal from './LogoutModal'
 
 export default function Layout() {
   const { isAuthenticated, user, logout } = useAuthStore()
   const navigate = useNavigate()
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   const handleLogout = () => {
     logout()
-    navigate('/login')
+    setShowLogoutModal(false)
+    navigate('/')
   }
 
   return (
@@ -32,29 +36,29 @@ export default function Layout() {
                 className="flex items-center space-x-1 text-gray-600 hover:text-indigo-600 transition"
               >
                 <FileText size={18} />
-                <span>Blogs</span>
+                <span>Blog</span>
               </Link>
 
               {isAuthenticated ? (
                 <>
                   <Link
-                    to="/blogs/create"
+                    to="/dashboard"
                     className="flex items-center space-x-1 text-gray-600 hover:text-indigo-600 transition"
                   >
-                    <PlusCircle size={18} />
-                    <span>New Blog</span>
-                  </Link>
-                  <Link
-                    to="/my-blogs"
-                    className="flex items-center space-x-1 text-gray-600 hover:text-indigo-600 transition"
-                  >
-                    <User size={18} />
-                    <span>My Blogs</span>
+                    <LayoutDashboard size={18} />
+                    <span>Dashboard</span>
                   </Link>
                   <div className="flex items-center space-x-3 ml-4 pl-4 border-l">
-                    <span className="text-sm text-gray-500">{user?.name}</span>
+                    <span className="text-sm text-gray-500">
+                      {user?.name}
+                      {user?.role === 'admin' && (
+                        <span className="ml-1 px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded">
+                          Admin
+                        </span>
+                      )}
+                    </span>
                     <button
-                      onClick={handleLogout}
+                      onClick={() => setShowLogoutModal(true)}
                       className="flex items-center space-x-1 text-red-600 hover:text-red-700 transition"
                     >
                       <LogOut size={18} />
@@ -87,6 +91,12 @@ export default function Layout() {
           GoFiver - Built with Go, Fiber & React
         </div>
       </footer>
+
+      <LogoutModal
+        isOpen={showLogoutModal}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutModal(false)}
+      />
     </div>
   )
 }

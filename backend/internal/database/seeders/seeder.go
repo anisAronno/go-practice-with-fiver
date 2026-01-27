@@ -42,22 +42,23 @@ func (s *Seeder) Run() error {
 	return nil
 }
 
-// seedUsers creates demo users
 func (s *Seeder) seedUsers() error {
 	users := []struct {
 		Name     string
 		Email    string
 		Password string
+		Role     string
 	}{
-		{"Admin User", "admin@example.com", "password123"},
-		{"John Doe", "john@example.com", "password123"},
-		{"Jane Smith", "jane@example.com", "password123"},
+		{"Admin User", "admin@example.com", "password123", "admin"},
+		{"John Doe", "john@example.com", "password123", "author"},
+		{"Jane Smith", "jane@example.com", "password123", "author"},
 	}
 
 	for _, u := range users {
 		user := &models.User{
 			Name:  u.Name,
 			Email: u.Email,
+			Role:  u.Role,
 		}
 		if err := user.HashPassword(u.Password); err != nil {
 			return err
@@ -65,7 +66,7 @@ func (s *Seeder) seedUsers() error {
 		if err := s.db.Create(user).Error; err != nil {
 			return err
 		}
-		log.Printf("Created user: %s (%s)", user.Name, user.Email)
+		log.Printf("Created user: %s (%s) [%s]", user.Name, user.Email, user.Role)
 	}
 
 	return nil

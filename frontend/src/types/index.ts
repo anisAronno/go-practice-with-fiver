@@ -2,18 +2,22 @@ export interface User {
   id: number
   name: string
   email: string
+  role: 'admin' | 'author'
   created_at: string
   updated_at: string
+  deleted_at?: string
 }
 
 export interface Blog {
   id: number
   title: string
   content: string
+  image?: string | null
   user_id: number
   user?: User
   created_at: string
   updated_at: string
+  deleted_at?: string
 }
 
 export interface ApiResponse<T> {
@@ -57,4 +61,13 @@ export interface CreateBlogRequest {
 export interface UpdateBlogRequest {
   title?: string
   content?: string
+}
+
+export interface UpdateUserRequest {
+  name?: string
+  email?: string
+}
+
+export interface UpdateRoleRequest {
+  role: 'admin' | 'author'
 }

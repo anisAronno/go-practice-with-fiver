@@ -6,22 +6,18 @@ import (
 	"gorm.io/gorm"
 )
 
-// UserRepository handles user database operations (like Laravel Repository pattern)
 type UserRepository struct {
 	db *gorm.DB
 }
 
-// NewUserRepository creates a new user repository
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// Create creates a new user
 func (r *UserRepository) Create(user *models.User) error {
 	return r.db.Create(user).Error
 }
 
-// FindByID finds a user by ID
 func (r *UserRepository) FindByID(id uint) (*models.User, error) {
 	var user models.User
 	err := r.db.First(&user, id).Error
@@ -31,7 +27,6 @@ func (r *UserRepository) FindByID(id uint) (*models.User, error) {
 	return &user, nil
 }
 
-// FindByEmail finds a user by email
 func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := r.db.Where("email = ?", email).First(&user).Error
@@ -41,7 +36,6 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
-// FindAll returns all users with pagination
 func (r *UserRepository) FindAll(offset, limit int) ([]models.User, int64, error) {
 	var users []models.User
 	var total int64
@@ -52,17 +46,14 @@ func (r *UserRepository) FindAll(offset, limit int) ([]models.User, int64, error
 	return users, total, err
 }
 
-// Update updates a user
 func (r *UserRepository) Update(user *models.User) error {
 	return r.db.Save(user).Error
 }
 
-// Delete soft deletes a user
 func (r *UserRepository) Delete(id uint) error {
 	return r.db.Delete(&models.User{}, id).Error
 }
 
-// ExistsByEmail checks if email exists
 func (r *UserRepository) ExistsByEmail(email string, excludeID ...uint) bool {
 	var count int64
 	query := r.db.Model(&models.User{}).Where("email = ?", email)
@@ -71,4 +62,31 @@ func (r *UserRepository) ExistsByEmail(email string, excludeID ...uint) bool {
 	}
 	query.Count(&count)
 	return count > 0
+}
+
+func (r *UserRepository) FindAllDeleted(offset, limit int) ([]models.User, int64, error) {
+	var users []models.User
+	var total int64
+
+	r.db.Unscoped().Model(&models.User{}).Where("deleted_at IS NOT NULL").Count(&total)
+	err := r.db.Unscoped().Where("deleted_at IS NOT NULL").Offset(offset).Limit(limit).Order("deleted_at DESC").Find(&users).Error
+
+	return users, total, err
+}
+
+func (r *UserRepository) FindDeletedByID(id uint) (*models.User, error) {
+	var user models.User
+	err := r.db.Unscoped().Where("id = ? AND deleted_at IS NOT NULL", id).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepository) Restore(id uint) error {
+	return r.db.Unscoped().Model(&models.User{}).Where("id = ?", id).Update("deleted_at", nil).Error
+}
+
+func (r *UserRepository) ForceDelete(id uint) error {
+	return r.db.Unscoped().Delete(&models.User{}, id).Error
 }

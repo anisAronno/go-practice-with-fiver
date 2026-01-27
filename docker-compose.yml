@@ -8,6 +8,7 @@ services:
     volumes:
       - ./backend:/app
       - go-modules:/go/pkg/mod
+      - uploads:/app/uploads
     env_file:
       - .env
     working_dir: /app
@@ -39,12 +40,15 @@ services:
     depends_on:
       - api
       - frontend
+    volumes:
+      - uploads:/app/uploads:ro
     networks:
       - gofiver-internal
     restart: unless-stopped
 
 volumes:
   go-modules:
+  uploads:
 
 networks:
   common-net:

@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// Config holds all application configuration
 type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
@@ -39,7 +38,6 @@ type JWTConfig struct {
 	Expiry time.Duration
 }
 
-// Load returns application configuration from environment
 func Load() *Config {
 	return &Config{
 		App: AppConfig{

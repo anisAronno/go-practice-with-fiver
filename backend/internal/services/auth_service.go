@@ -11,13 +11,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// AuthService handles authentication logic
 type AuthService struct {
 	userRepo *repositories.UserRepository
 	config   *config.Config
 }
 
-// NewAuthService creates a new auth service
 func NewAuthService(userRepo *repositories.UserRepository, config *config.Config) *AuthService {
 	return &AuthService{
 		userRepo: userRepo,
@@ -25,14 +23,13 @@ func NewAuthService(userRepo *repositories.UserRepository, config *config.Config
 	}
 }
 
-// Register creates a new user account
 func (s *AuthService) Register(req *dto.RegisterRequest) (*models.User, string, error) {
-	// Check if email exists
+
 	if s.userRepo.ExistsByEmail(req.Email) {
 		return nil, "", errors.New("email already exists")
 	}
 
-	// Create user
+
 	user := &models.User{
 		Name:  req.Name,
 		Email: req.Email,
@@ -46,7 +43,7 @@ func (s *AuthService) Register(req *dto.RegisterRequest) (*models.User, string, 
 		return nil, "", err
 	}
 
-	// Generate token
+
 	token, err := s.generateToken(user)
 	if err != nil {
 		return nil, "", err
@@ -55,7 +52,6 @@ func (s *AuthService) Register(req *dto.RegisterRequest) (*models.User, string, 
 	return user, token, nil
 }
 
-// Login authenticates a user
 func (s *AuthService) Login(req *dto.LoginRequest) (*models.User, string, error) {
 	user, err := s.userRepo.FindByEmail(req.Email)
 	if err != nil {
@@ -74,7 +70,6 @@ func (s *AuthService) Login(req *dto.LoginRequest) (*models.User, string, error)
 	return user, token, nil
 }
 
-// generateToken creates a JWT token
 func (s *AuthService) generateToken(user *models.User) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
@@ -86,7 +81,6 @@ func (s *AuthService) generateToken(user *models.User) (string, error) {
 	return token.SignedString([]byte(s.config.JWT.Secret))
 }
 
-// ValidateToken validates and parses a JWT token
 func (s *AuthService) ValidateToken(tokenString string) (*jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.config.JWT.Secret), nil

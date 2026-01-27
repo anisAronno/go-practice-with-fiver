@@ -4,9 +4,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// Response provides consistent API responses (like Laravel's API Resources)
-
-// Success returns a success response
 func Success(c *fiber.Ctx, data interface{}, message ...string) error {
 	msg := "Success"
 	if len(message) > 0 {
@@ -20,7 +17,6 @@ func Success(c *fiber.Ctx, data interface{}, message ...string) error {
 	})
 }
 
-// Created returns a 201 created response
 func Created(c *fiber.Ctx, data interface{}, message ...string) error {
 	msg := "Created successfully"
 	if len(message) > 0 {
@@ -34,7 +30,6 @@ func Created(c *fiber.Ctx, data interface{}, message ...string) error {
 	})
 }
 
-// Paginated returns a paginated response
 func Paginated(c *fiber.Ctx, data interface{}, total int64, page, perPage int) error {
 	totalPages := int(total) / perPage
 	if int(total)%perPage > 0 {
@@ -53,7 +48,6 @@ func Paginated(c *fiber.Ctx, data interface{}, total int64, page, perPage int) e
 	})
 }
 
-// Error returns an error response
 func Error(c *fiber.Ctx, status int, message string) error {
 	return c.Status(status).JSON(fiber.Map{
 		"success": false,
@@ -61,27 +55,22 @@ func Error(c *fiber.Ctx, status int, message string) error {
 	})
 }
 
-// BadRequest returns a 400 response
 func BadRequest(c *fiber.Ctx, message string) error {
 	return Error(c, fiber.StatusBadRequest, message)
 }
 
-// Unauthorized returns a 401 response
 func Unauthorized(c *fiber.Ctx, message string) error {
 	return Error(c, fiber.StatusUnauthorized, message)
 }
 
-// Forbidden returns a 403 response
 func Forbidden(c *fiber.Ctx, message string) error {
 	return Error(c, fiber.StatusForbidden, message)
 }
 
-// NotFound returns a 404 response
 func NotFound(c *fiber.Ctx, message string) error {
 	return Error(c, fiber.StatusNotFound, message)
 }
 
-// InternalError returns a 500 response
 func InternalError(c *fiber.Ctx, message string) error {
 	return Error(c, fiber.StatusInternalServerError, message)
 }

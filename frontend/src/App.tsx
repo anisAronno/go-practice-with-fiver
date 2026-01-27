@@ -9,7 +9,9 @@ import BlogDetailPage from './pages/BlogDetailPage'
 import CreateBlogPage from './pages/CreateBlogPage'
 import EditBlogPage from './pages/EditBlogPage'
 import MyBlogsPage from './pages/MyBlogsPage'
+import DashboardPage from './pages/DashboardPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import GuestRoute from './components/GuestRoute'
 
 function App() {
   return (
@@ -18,11 +20,18 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="register" element={<RegisterPage />} />
+          
+          <Route element={<GuestRoute />}>
+            <Route path="login" element={<LoginPage />} />
+            <Route path="register" element={<RegisterPage />} />
+          </Route>
+          
+          {/* Public routes */}
           <Route path="blogs" element={<BlogsPage />} />
           <Route path="blogs/:id" element={<BlogDetailPage />} />
+          
           <Route element={<ProtectedRoute />}>
+            <Route path="dashboard" element={<DashboardPage />} />
             <Route path="blogs/create" element={<CreateBlogPage />} />
             <Route path="blogs/:id/edit" element={<EditBlogPage />} />
             <Route path="my-blogs" element={<MyBlogsPage />} />

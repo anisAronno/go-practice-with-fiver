@@ -7,17 +7,14 @@ import (
 	"gofiver/internal/repositories"
 )
 
-// BlogService handles blog business logic
 type BlogService struct {
 	blogRepo *repositories.BlogRepository
 }
 
-// NewBlogService creates a new blog service
 func NewBlogService(blogRepo *repositories.BlogRepository) *BlogService {
 	return &BlogService{blogRepo: blogRepo}
 }
 
-// Create creates a new blog
 func (s *BlogService) Create(userID uint, req *dto.CreateBlogRequest) (*models.Blog, error) {
 	blog := &models.Blog{
 		Title:   req.Title,
@@ -29,34 +26,28 @@ func (s *BlogService) Create(userID uint, req *dto.CreateBlogRequest) (*models.B
 		return nil, err
 	}
 
-	// Reload with user
 	return s.blogRepo.FindByID(blog.ID)
 }
 
-// GetAll returns paginated blogs
 func (s *BlogService) GetAll(pagination *dto.PaginationQuery) ([]models.Blog, int64, error) {
 	return s.blogRepo.FindAll(pagination.GetOffset(), pagination.GetPerPage())
 }
 
-// GetByID returns a blog by ID
 func (s *BlogService) GetByID(id uint) (*models.Blog, error) {
 	return s.blogRepo.FindByID(id)
 }
 
-// GetByUserID returns blogs by user
 func (s *BlogService) GetByUserID(userID uint, pagination *dto.PaginationQuery) ([]models.Blog, int64, error) {
 	return s.blogRepo.FindByUserID(userID, pagination.GetOffset(), pagination.GetPerPage())
 }
 
-// Update updates a blog (only owner can update)
-func (s *BlogService) Update(id, userID uint, req *dto.UpdateBlogRequest) (*models.Blog, error) {
+func (s *BlogService) Update(id, userID uint, req *dto.UpdateBlogRequest, isAdmin bool) (*models.Blog, error) {
 	blog, err := s.blogRepo.FindByID(id)
 	if err != nil {
 		return nil, errors.New("blog not found")
 	}
 
-	// Check ownership
-	if blog.UserID != userID {
+	if blog.UserID != userID && !isAdmin {
 		return nil, errors.New("unauthorized")
 	}
 
@@ -74,17 +65,44 @@ func (s *BlogService) Update(id, userID uint, req *dto.UpdateBlogRequest) (*mode
 	return blog, nil
 }
 
-// Delete deletes a blog (only owner can delete)
-func (s *BlogService) Delete(id, userID uint) error {
+func (s *BlogService) Delete(id, userID uint, isAdmin bool) error {
 	blog, err := s.blogRepo.FindByID(id)
 	if err != nil {
 		return errors.New("blog not found")
 	}
 
-	// Check ownership
-	if blog.UserID != userID {
+	if blog.UserID != userID && !isAdmin {
 		return errors.New("unauthorized")
 	}
 
 	return s.blogRepo.Delete(id)
+}
+
+func (s *BlogService) GetAllDeleted(pagination *dto.PaginationQuery) ([]models.Blog, int64, error) {
+	return s.blogRepo.FindAllDeleted(pagination.GetOffset(), pagination.GetPerPage())
+}
+
+func (s *BlogService) Restore(id uint) error {
+	_, err := s.blogRepo.FindDeletedByID(id)
+	if err != nil {
+		return errors.New("deleted blog not found")
+	}
+	return s.blogRepo.Restore(id)
+}
+
+func (s *BlogService) ForceDelete(id uint) error {
+	_, err := s.blogRepo.FindDeletedByID(id)
+	if err != nil {
+		return errors.New("deleted blog not found")
+	}
+	return s.blogRepo.ForceDelete(id)
+}
+
+func (s *BlogService) UpdateImage(id uint, imagePath string) error {
+	blog, err := s.blogRepo.FindByID(id)
+	if err != nil {
+		return errors.New("blog not found")
+	}
+	blog.Image = &imagePath
+	return s.blogRepo.Update(blog)
 }
