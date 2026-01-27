@@ -83,4 +83,7 @@ export const blogService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+
+  deleteImage: (id: number) =>
+    api.delete<ApiResponse<null>>(`/blogs/${id}/image`),
 }

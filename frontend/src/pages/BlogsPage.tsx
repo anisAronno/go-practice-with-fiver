@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { blogService } from '../services'
 import type { Blog } from '../types'
-import BlogCard from '../components/BlogCard'
-import LoadingSpinner from '../components/LoadingSpinner'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, User } from 'lucide-react'
+
+const API_URL = import.meta.env.VITE_API_URL || ''
+
+const getImageUrl = (path: string) => {
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  return `${API_URL}${path}`
+}
 
 export default function BlogsPage() {
   const [blogs, setBlogs] = useState<Blog[]>([])
@@ -19,8 +26,8 @@ export default function BlogsPage() {
     setLoading(true)
     try {
       const response = await blogService.getAll(page)
-      setBlogs(response.data.data)
-      setTotalPages(response.data.meta.total_pages)
+      setBlogs(response.data.data || [])
+      setTotalPages(response.data.meta?.total_pages || 1)
     } catch (error) {
       console.error('Failed to fetch blogs:', error)
     } finally {
@@ -28,8 +35,22 @@ export default function BlogsPage() {
     }
   }
 
+  const formatDate = (date: string) => new Date(date).toLocaleDateString()
+
   if (loading) {
-    return <LoadingSpinner className="py-20" size={40} />
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-white rounded-xl border overflow-hidden animate-pulse">
+            <div className="h-48 bg-gray-200" />
+            <div className="p-5 space-y-3">
+              <div className="h-6 bg-gray-200 rounded w-3/4" />
+              <div className="h-4 bg-gray-200 rounded w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -42,9 +63,46 @@ export default function BlogsPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {blogs.map((blog) => (
-              <BlogCard key={blog.id} blog={blog} />
+              <Link
+                key={blog.id}
+                to={`/blogs/${blog.id}`}
+                className="bg-white rounded-xl border overflow-hidden hover:shadow-lg transition group"
+              >
+                <div className="h-48 bg-gray-100 overflow-hidden">
+                  {blog.image ? (
+                    <img
+                      src={getImageUrl(blog.image)}
+                      alt={blog.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100">
+                      <span className="text-4xl font-bold text-indigo-300">
+                        {blog.title.charAt(0)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-5">
+                  <h2 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-600 transition line-clamp-2">
+                    {blog.title}
+                  </h2>
+                  <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+                    {blog.user && (
+                      <span className="flex items-center gap-1">
+                        <User size={14} />
+                        {blog.user.name}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Calendar size={14} />
+                      {formatDate(blog.created_at)}
+                    </span>
+                  </div>
+                </div>
+              </Link>
             ))}
           </div>
 
@@ -53,18 +111,16 @@ export default function BlogsPage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="flex items-center space-x-1 px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="flex items-center space-x-1 px-4 py-2 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
               >
                 <ChevronLeft size={18} />
                 <span>Previous</span>
               </button>
-              <span className="text-gray-600">
-                Page {page} of {totalPages}
-              </span>
+              <span className="text-gray-600">Page {page} of {totalPages}</span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="flex items-center space-x-1 px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="flex items-center space-x-1 px-4 py-2 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
               >
                 <span>Next</span>
                 <ChevronRight size={18} />

@@ -8,6 +8,7 @@ export default function Layout() {
   const { isAuthenticated, user, logout } = useAuthStore()
   const navigate = useNavigate()
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const isAdmin = user?.role === 'admin'
 
   const handleLogout = () => {
     logout()
@@ -51,7 +52,7 @@ export default function Layout() {
                   <div className="flex items-center space-x-3 ml-4 pl-4 border-l">
                     <span className="text-sm text-gray-500">
                       {user?.name}
-                      {user?.role === 'admin' && (
+                      {isAdmin && (
                         <span className="ml-1 px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded">
                           Admin
                         </span>

@@ -58,6 +58,7 @@ func RegisterRoutes(app *fiber.App, db *database.Database, redis *database.Redis
 	protected.Put("/blogs/:id", blogController.Update)
 	protected.Delete("/blogs/:id", blogController.Delete)
 	protected.Post("/blogs/:id/image", blogController.UploadImage)
+	protected.Delete("/blogs/:id/image", blogController.DeleteImage)
 
 	admin := api.Group("/admin", middleware.AuthMiddleware(cfg, userRepo), middleware.AdminMiddleware())
 

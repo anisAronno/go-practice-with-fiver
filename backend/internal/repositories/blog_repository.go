@@ -32,7 +32,16 @@ func (r *BlogRepository) FindAll(offset, limit int) ([]models.Blog, int64, error
 	var total int64
 
 	r.db.Model(&models.Blog{}).Count(&total)
-	err := r.db.Preload("User").Offset(offset).Limit(limit).Order("created_at DESC").Find(&blogs).Error
+
+	err := r.db.
+		Select("blogs.id, blogs.title, blogs.image, blogs.user_id, blogs.created_at").
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, name")
+		}).
+		Offset(offset).
+		Limit(limit).
+		Order("blogs.id DESC").
+		Find(&blogs).Error
 
 	return blogs, total, err
 }
@@ -42,7 +51,14 @@ func (r *BlogRepository) FindByUserID(userID uint, offset, limit int) ([]models.
 	var total int64
 
 	r.db.Model(&models.Blog{}).Where("user_id = ?", userID).Count(&total)
-	err := r.db.Where("user_id = ?", userID).Offset(offset).Limit(limit).Order("created_at DESC").Find(&blogs).Error
+
+	err := r.db.
+		Select("id, title, image, user_id, created_at").
+		Where("user_id = ?", userID).
+		Offset(offset).
+		Limit(limit).
+		Order("id DESC").
+		Find(&blogs).Error
 
 	return blogs, total, err
 }
@@ -66,7 +82,17 @@ func (r *BlogRepository) FindAllDeleted(offset, limit int) ([]models.Blog, int64
 	var total int64
 
 	r.db.Unscoped().Model(&models.Blog{}).Where("deleted_at IS NOT NULL").Count(&total)
-	err := r.db.Unscoped().Preload("User").Where("deleted_at IS NOT NULL").Offset(offset).Limit(limit).Order("deleted_at DESC").Find(&blogs).Error
+
+	err := r.db.Unscoped().
+		Select("blogs.id, blogs.title, blogs.image, blogs.user_id, blogs.created_at, blogs.deleted_at").
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, name")
+		}).
+		Where("blogs.deleted_at IS NOT NULL").
+		Offset(offset).
+		Limit(limit).
+		Order("blogs.deleted_at DESC").
+		Find(&blogs).Error
 
 	return blogs, total, err
 }
@@ -86,4 +112,8 @@ func (r *BlogRepository) Restore(id uint) error {
 
 func (r *BlogRepository) ForceDelete(id uint) error {
 	return r.db.Unscoped().Delete(&models.Blog{}, id).Error
+}
+
+func (r *BlogRepository) UpdateImage(id uint, imagePath string) error {
+	return r.db.Model(&models.Blog{}).Where("id = ?", id).Update("image", imagePath).Error
 }

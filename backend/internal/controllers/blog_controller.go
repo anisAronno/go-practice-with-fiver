@@ -31,7 +31,7 @@ func (ctrl *BlogController) Index(c *fiber.Ctx) error {
 
 	var data []map[string]interface{}
 	for _, blog := range blogs {
-		data = append(data, blog.ToResponse())
+		data = append(data, blog.ToListResponse())
 	}
 
 	return response.Paginated(c, data, total, pagination.GetPage(), pagination.GetPerPage())
@@ -131,7 +131,7 @@ func (ctrl *BlogController) MyBlogs(c *fiber.Ctx) error {
 
 	var data []map[string]interface{}
 	for _, blog := range blogs {
-		data = append(data, blog.ToResponse())
+		data = append(data, blog.ToListResponse())
 	}
 
 	return response.Paginated(c, data, total, pagination.GetPage(), pagination.GetPerPage())
@@ -155,7 +155,7 @@ func (ctrl *BlogController) UserBlogs(c *fiber.Ctx) error {
 
 	var data []map[string]interface{}
 	for _, blog := range blogs {
-		data = append(data, blog.ToResponse())
+		data = append(data, blog.ToListResponse())
 	}
 
 	return response.Paginated(c, data, total, pagination.GetPage(), pagination.GetPerPage())
@@ -174,7 +174,7 @@ func (ctrl *BlogController) Trashed(c *fiber.Ctx) error {
 
 	var data []map[string]interface{}
 	for _, blog := range blogs {
-		data = append(data, blog.ToResponse())
+		data = append(data, blog.ToListResponse())
 	}
 
 	return response.Paginated(c, data, total, pagination.GetPage(), pagination.GetPerPage())
@@ -255,4 +255,29 @@ func (ctrl *BlogController) UploadImage(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, map[string]string{"image": uploadPath}, "Image uploaded successfully")
+}
+
+func (ctrl *BlogController) DeleteImage(c *fiber.Ctx) error {
+	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+	if err != nil {
+		return response.BadRequest(c, "Invalid blog ID")
+	}
+
+	userID := c.Locals("userID").(uint)
+	currentUser := c.Locals("user").(*models.User)
+
+	blog, err := ctrl.blogService.GetByID(uint(id))
+	if err != nil {
+		return response.NotFound(c, "Blog not found")
+	}
+
+	if blog.UserID != userID && !currentUser.IsAdmin() {
+		return response.Forbidden(c, "You can only update your own blogs")
+	}
+
+	if err := ctrl.blogService.UpdateImage(uint(id), ""); err != nil {
+		return response.InternalError(c, "Failed to delete image")
+	}
+
+	return response.Success(c, nil, "Image deleted successfully")
 }
