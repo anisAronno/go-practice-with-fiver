@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { blogService } from '../services'
 import type { Blog } from '../types'
 import { ChevronLeft, ChevronRight, Calendar, User, Search, X } from 'lucide-react'
@@ -13,12 +13,20 @@ const getImageUrl = (path: string) => {
 }
 
 export default function BlogsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [blogs, setBlogs] = useState<Blog[]>([])
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'))
   const [totalPages, setTotalPages] = useState(1)
-  const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState(searchParams.get('search') || '')
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
+
+  const updateUrl = useCallback((newPage: number, newSearch: string) => {
+    const params = new URLSearchParams()
+    if (newPage > 1) params.set('page', String(newPage))
+    if (newSearch) params.set('search', newSearch)
+    setSearchParams(params)
+  }, [setSearchParams])
 
   const fetchBlogs = useCallback(async () => {
     setLoading(true)
@@ -42,15 +50,21 @@ export default function BlogsPage() {
       if (searchInput !== search) {
         setSearch(searchInput)
         setPage(1)
+        updateUrl(1, searchInput)
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchInput, search])
+  }, [searchInput, search, updateUrl])
+
+  useEffect(() => {
+    updateUrl(page, search)
+  }, [page, search, updateUrl])
 
   const clearSearch = () => {
     setSearchInput('')
     setSearch('')
     setPage(1)
+    updateUrl(1, '')
   }
 
   const formatDate = (date: string) => new Date(date).toLocaleDateString()
@@ -150,7 +164,7 @@ export default function BlogsPage() {
           {totalPages > 1 && (
             <div className="flex justify-center items-center space-x-4 mt-8">
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
                 className="flex items-center space-x-1 px-4 py-2 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
               >
@@ -159,7 +173,7 @@ export default function BlogsPage() {
               </button>
               <span className="text-gray-600">Page {page} of {totalPages}</span>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
                 className="flex items-center space-x-1 px-4 py-2 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
               >

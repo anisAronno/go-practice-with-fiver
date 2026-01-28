@@ -40,7 +40,7 @@ func (r *BlogRepository) FindAll(offset, limit int, search string) ([]models.Blo
 		Limit(limit)
 
 	if search != "" {
-		query = query.Where("blogs.title LIKE ?", search+"%")
+		query = query.Where("blogs.title LIKE ? OR blogs.content LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
 
 	err := query.Find(&blogs).Error
@@ -51,7 +51,7 @@ func (r *BlogRepository) GetCount(search string) (int64, error) {
 	var count int64
 	query := r.db.Model(&models.Blog{})
 	if search != "" {
-		query = query.Where("title LIKE ?", search+"%")
+		query = query.Where("title LIKE ? OR content LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
 	err := query.Count(&count).Error
 	return count, err
