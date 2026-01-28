@@ -60,20 +60,16 @@ func (d *Database) AutoMigrate() error {
 }
 
 func (d *Database) CreateIndexes() error {
-
 	indexes := []string{
 		"CREATE INDEX IF NOT EXISTS idx_blogs_id_desc ON blogs (id DESC)",
 		"CREATE INDEX IF NOT EXISTS idx_blogs_deleted_at ON blogs (deleted_at)",
-		"CREATE INDEX IF NOT EXISTS idx_blogs_user_deleted ON blogs (user_id, deleted_at, id DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_blogs_user_id ON blogs (user_id)",
+		"CREATE INDEX IF NOT EXISTS idx_blogs_title ON blogs (title(100))",
 		"CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users (deleted_at)",
-		"CREATE INDEX IF NOT EXISTS idx_users_id_desc ON users (id DESC)",
 	}
 
 	for _, idx := range indexes {
-		if err := d.DB.Exec(idx).Error; err != nil {
-		
-			continue
-		}
+		d.DB.Exec(idx)
 	}
 	return nil
 }

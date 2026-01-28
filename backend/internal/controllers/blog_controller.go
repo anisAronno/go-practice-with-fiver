@@ -11,222 +11,226 @@ import (
 )
 
 type BlogController struct {
-	blogService *services.BlogService
+	svc *services.BlogService
 }
 
-func NewBlogController(blogService *services.BlogService) *BlogController {
-	return &BlogController{blogService: blogService}
+func NewBlogController(svc *services.BlogService) *BlogController {
+	return &BlogController{svc: svc}
 }
 
-func (ctrl *BlogController) Index(c *fiber.Ctx) error {
-	pagination := &dto.PaginationQuery{
-		Page:    c.QueryInt("page", 1),
-		PerPage: c.QueryInt("per_page", 15),
+func (c *BlogController) Index(ctx *fiber.Ctx) error {
+	q := &dto.BlogSearchQuery{
+		Page:    ctx.QueryInt("page", 1),
+		PerPage: ctx.QueryInt("per_page", 20),
+		Search:  ctx.Query("search"),
 	}
 
-	blogs, total, err := ctrl.blogService.GetAll(pagination)
+	blogs, total, err := c.svc.GetAll(q)
 	if err != nil {
-		return response.InternalError(c, "Failed to fetch blogs")
+		return response.InternalError(ctx, "Failed to fetch blogs")
 	}
 
-	var data []map[string]interface{}
-	for _, blog := range blogs {
-		data = append(data, blog.ToListResponse())
+	data := make([]map[string]interface{}, len(blogs))
+	for i, b := range blogs {
+		data[i] = map[string]interface{}{
+			"id":         b.ID,
+			"title":      b.Title,
+			"image":      b.Image,
+			"user_id":    b.UserID,
+			"created_at": b.CreatedAt,
+			"user":       map[string]interface{}{"id": b.UserID, "name": b.UserName},
+		}
 	}
 
-	return response.Paginated(c, data, total, pagination.GetPage(), pagination.GetPerPage())
+	return response.Paginated(ctx, data, total, q.GetPage(), q.GetPerPage())
 }
 
-func (ctrl *BlogController) Show(c *fiber.Ctx) error {
-	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+func (c *BlogController) Show(ctx *fiber.Ctx) error {
+	id, err := strconv.ParseUint(ctx.Params("id"), 10, 32)
 	if err != nil {
-		return response.BadRequest(c, "Invalid blog ID")
+		return response.BadRequest(ctx, "Invalid blog ID")
 	}
 
-	blog, err := ctrl.blogService.GetByID(uint(id))
+	blog, err := c.svc.GetByID(uint(id))
 	if err != nil {
-		return response.NotFound(c, "Blog not found")
+		return response.NotFound(ctx, "Blog not found")
 	}
 
-	return response.Success(c, blog.ToResponse())
+	return response.Success(ctx, blog.ToResponse())
 }
 
-func (ctrl *BlogController) Store(c *fiber.Ctx) error {
+func (c *BlogController) Store(ctx *fiber.Ctx) error {
 	var req dto.CreateBlogRequest
-
-	if err := c.BodyParser(&req); err != nil {
-		return response.BadRequest(c, "Invalid request body")
+	if err := ctx.BodyParser(&req); err != nil {
+		return response.BadRequest(ctx, "Invalid request body")
 	}
-
 	if req.Title == "" || req.Content == "" {
-		return response.BadRequest(c, "Title and content are required")
+		return response.BadRequest(ctx, "Title and content are required")
 	}
 
-	userID := c.Locals("userID").(uint)
-
-	blog, err := ctrl.blogService.Create(userID, &req)
+	userID := ctx.Locals("userID").(uint)
+	blog, err := c.svc.Create(userID, &req)
 	if err != nil {
-		return response.InternalError(c, "Failed to create blog")
+		return response.InternalError(ctx, "Failed to create blog")
 	}
 
-	return response.Created(c, blog.ToResponse(), "Blog created successfully")
+	return response.Created(ctx, blog.ToResponse(), "Blog created successfully")
 }
 
-func (ctrl *BlogController) Update(c *fiber.Ctx) error {
-	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+func (c *BlogController) Update(ctx *fiber.Ctx) error {
+	id, err := strconv.ParseUint(ctx.Params("id"), 10, 32)
 	if err != nil {
-		return response.BadRequest(c, "Invalid blog ID")
+		return response.BadRequest(ctx, "Invalid blog ID")
 	}
 
 	var req dto.UpdateBlogRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.BadRequest(c, "Invalid request body")
+	if err := ctx.BodyParser(&req); err != nil {
+		return response.BadRequest(ctx, "Invalid request body")
 	}
 
-	userID := c.Locals("userID").(uint)
-	currentUser := c.Locals("user").(*models.User)
+	userID := ctx.Locals("userID").(uint)
+	user := ctx.Locals("user").(*models.User)
 
-	blog, err := ctrl.blogService.Update(uint(id), userID, &req, currentUser.IsAdmin())
+	blog, err := c.svc.Update(uint(id), userID, &req, user.IsAdmin())
 	if err != nil {
 		if err.Error() == "unauthorized" {
-			return response.Forbidden(c, "You can only update your own blogs")
+			return response.Forbidden(ctx, "You can only update your own blogs")
 		}
-		return response.BadRequest(c, err.Error())
+		return response.BadRequest(ctx, err.Error())
 	}
 
-	return response.Success(c, blog.ToResponse(), "Blog updated successfully")
+	return response.Success(ctx, blog.ToResponse(), "Blog updated successfully")
 }
 
-func (ctrl *BlogController) Delete(c *fiber.Ctx) error {
-	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+func (c *BlogController) Delete(ctx *fiber.Ctx) error {
+	id, err := strconv.ParseUint(ctx.Params("id"), 10, 32)
 	if err != nil {
-		return response.BadRequest(c, "Invalid blog ID")
+		return response.BadRequest(ctx, "Invalid blog ID")
 	}
 
-	userID := c.Locals("userID").(uint)
-	currentUser := c.Locals("user").(*models.User)
+	userID := ctx.Locals("userID").(uint)
+	user := ctx.Locals("user").(*models.User)
 
-	if err := ctrl.blogService.Delete(uint(id), userID, currentUser.IsAdmin()); err != nil {
+	if err := c.svc.Delete(uint(id), userID, user.IsAdmin()); err != nil {
 		if err.Error() == "unauthorized" {
-			return response.Forbidden(c, "You can only delete your own blogs")
+			return response.Forbidden(ctx, "You can only delete your own blogs")
 		}
-		return response.BadRequest(c, err.Error())
+		return response.BadRequest(ctx, err.Error())
 	}
 
-	return response.Success(c, nil, "Blog deleted successfully")
+	return response.Success(ctx, nil, "Blog deleted successfully")
 }
 
-func (ctrl *BlogController) MyBlogs(c *fiber.Ctx) error {
-	pagination := &dto.PaginationQuery{
-		Page:    c.QueryInt("page", 1),
-		PerPage: c.QueryInt("per_page", 15),
+func (c *BlogController) MyBlogs(ctx *fiber.Ctx) error {
+	q := &dto.PaginationQuery{
+		Page:    ctx.QueryInt("page", 1),
+		PerPage: ctx.QueryInt("per_page", 20),
 	}
 
-	userID := c.Locals("userID").(uint)
-
-	blogs, total, err := ctrl.blogService.GetByUserID(userID, pagination)
+	userID := ctx.Locals("userID").(uint)
+	blogs, total, err := c.svc.GetByUserID(userID, q)
 	if err != nil {
-		return response.InternalError(c, "Failed to fetch blogs")
+		return response.InternalError(ctx, "Failed to fetch blogs")
 	}
 
-	var data []map[string]interface{}
-	for _, blog := range blogs {
-		data = append(data, blog.ToListResponse())
+	data := make([]map[string]interface{}, len(blogs))
+	for i, b := range blogs {
+		data[i] = b.ToListResponse()
 	}
 
-	return response.Paginated(c, data, total, pagination.GetPage(), pagination.GetPerPage())
+	return response.Paginated(ctx, data, total, q.GetPage(), q.GetPerPage())
 }
 
-func (ctrl *BlogController) UserBlogs(c *fiber.Ctx) error {
-	userID, err := strconv.ParseUint(c.Params("id"), 10, 32)
+func (c *BlogController) UserBlogs(ctx *fiber.Ctx) error {
+	userID, err := strconv.ParseUint(ctx.Params("id"), 10, 32)
 	if err != nil {
-		return response.BadRequest(c, "Invalid user ID")
+		return response.BadRequest(ctx, "Invalid user ID")
 	}
 
-	pagination := &dto.PaginationQuery{
-		Page:    c.QueryInt("page", 1),
-		PerPage: c.QueryInt("per_page", 15),
+	q := &dto.PaginationQuery{
+		Page:    ctx.QueryInt("page", 1),
+		PerPage: ctx.QueryInt("per_page", 20),
 	}
 
-	blogs, total, err := ctrl.blogService.GetByUserID(uint(userID), pagination)
+	blogs, total, err := c.svc.GetByUserID(uint(userID), q)
 	if err != nil {
-		return response.InternalError(c, "Failed to fetch blogs")
+		return response.InternalError(ctx, "Failed to fetch blogs")
 	}
 
-	var data []map[string]interface{}
-	for _, blog := range blogs {
-		data = append(data, blog.ToListResponse())
+	data := make([]map[string]interface{}, len(blogs))
+	for i, b := range blogs {
+		data[i] = b.ToListResponse()
 	}
 
-	return response.Paginated(c, data, total, pagination.GetPage(), pagination.GetPerPage())
+	return response.Paginated(ctx, data, total, q.GetPage(), q.GetPerPage())
 }
 
-func (ctrl *BlogController) Trashed(c *fiber.Ctx) error {
-	pagination := &dto.PaginationQuery{
-		Page:    c.QueryInt("page", 1),
-		PerPage: c.QueryInt("per_page", 15),
+func (c *BlogController) Trashed(ctx *fiber.Ctx) error {
+	q := &dto.PaginationQuery{
+		Page:    ctx.QueryInt("page", 1),
+		PerPage: ctx.QueryInt("per_page", 20),
 	}
 
-	blogs, total, err := ctrl.blogService.GetAllDeleted(pagination)
+	blogs, total, err := c.svc.GetAllDeleted(q)
 	if err != nil {
-		return response.InternalError(c, "Failed to fetch deleted blogs")
+		return response.InternalError(ctx, "Failed to fetch deleted blogs")
 	}
 
-	var data []map[string]interface{}
-	for _, blog := range blogs {
-		data = append(data, blog.ToListResponse())
+	data := make([]map[string]interface{}, len(blogs))
+	for i, b := range blogs {
+		data[i] = b.ToListResponse()
 	}
 
-	return response.Paginated(c, data, total, pagination.GetPage(), pagination.GetPerPage())
+	return response.Paginated(ctx, data, total, q.GetPage(), q.GetPerPage())
 }
 
-func (ctrl *BlogController) Restore(c *fiber.Ctx) error {
-	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+func (c *BlogController) Restore(ctx *fiber.Ctx) error {
+	id, err := strconv.ParseUint(ctx.Params("id"), 10, 32)
 	if err != nil {
-		return response.BadRequest(c, "Invalid blog ID")
+		return response.BadRequest(ctx, "Invalid blog ID")
 	}
 
-	if err := ctrl.blogService.Restore(uint(id)); err != nil {
-		return response.BadRequest(c, err.Error())
+	if err := c.svc.Restore(uint(id)); err != nil {
+		return response.BadRequest(ctx, err.Error())
 	}
 
-	return response.Success(c, nil, "Blog restored successfully")
+	return response.Success(ctx, nil, "Blog restored successfully")
 }
 
-func (ctrl *BlogController) ForceDelete(c *fiber.Ctx) error {
-	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+func (c *BlogController) ForceDelete(ctx *fiber.Ctx) error {
+	id, err := strconv.ParseUint(ctx.Params("id"), 10, 32)
 	if err != nil {
-		return response.BadRequest(c, "Invalid blog ID")
+		return response.BadRequest(ctx, "Invalid blog ID")
 	}
 
-	if err := ctrl.blogService.ForceDelete(uint(id)); err != nil {
-		return response.BadRequest(c, err.Error())
+	if err := c.svc.ForceDelete(uint(id)); err != nil {
+		return response.BadRequest(ctx, err.Error())
 	}
 
-	return response.Success(c, nil, "Blog permanently deleted")
+	return response.Success(ctx, nil, "Blog permanently deleted")
 }
 
-func (ctrl *BlogController) UploadImage(c *fiber.Ctx) error {
-	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+func (c *BlogController) UploadImage(ctx *fiber.Ctx) error {
+	id, err := strconv.ParseUint(ctx.Params("id"), 10, 32)
 	if err != nil {
-		return response.BadRequest(c, "Invalid blog ID")
+		return response.BadRequest(ctx, "Invalid blog ID")
 	}
 
-	userID := c.Locals("userID").(uint)
-	currentUser := c.Locals("user").(*models.User)
+	userID := ctx.Locals("userID").(uint)
+	user := ctx.Locals("user").(*models.User)
 
-	blog, err := ctrl.blogService.GetByID(uint(id))
+	blog, err := c.svc.GetByID(uint(id))
 	if err != nil {
-		return response.NotFound(c, "Blog not found")
+		return response.NotFound(ctx, "Blog not found")
 	}
 
-	if blog.UserID != userID && !currentUser.IsAdmin() {
-		return response.Forbidden(c, "You can only update your own blogs")
+	if blog.UserID != userID && !user.IsAdmin() {
+		return response.Forbidden(ctx, "You can only update your own blogs")
 	}
 
-	file, err := c.FormFile("image")
+	file, err := ctx.FormFile("image")
 	if err != nil {
-		return response.BadRequest(c, "Image file required")
+		return response.BadRequest(ctx, "Image file required")
 	}
 
 	ext := ""
@@ -240,44 +244,44 @@ func (ctrl *BlogController) UploadImage(c *fiber.Ctx) error {
 	case "image/webp":
 		ext = ".webp"
 	default:
-		return response.BadRequest(c, "Invalid image format. Use jpg, png, gif, or webp")
+		return response.BadRequest(ctx, "Invalid image format")
 	}
 
 	filename := "blog_" + strconv.FormatUint(id, 10) + "_" + strconv.FormatInt(blog.UpdatedAt.Unix(), 10) + ext
 	uploadPath := "/uploads/" + filename
 
-	if err := c.SaveFile(file, "/app"+uploadPath); err != nil {
-		return response.InternalError(c, "Failed to save image")
+	if err := ctx.SaveFile(file, "/app"+uploadPath); err != nil {
+		return response.InternalError(ctx, "Failed to save image")
 	}
 
-	if err := ctrl.blogService.UpdateImage(uint(id), uploadPath); err != nil {
-		return response.InternalError(c, "Failed to update blog image")
+	if err := c.svc.UpdateImage(uint(id), uploadPath); err != nil {
+		return response.InternalError(ctx, "Failed to update blog image")
 	}
 
-	return response.Success(c, map[string]string{"image": uploadPath}, "Image uploaded successfully")
+	return response.Success(ctx, map[string]string{"image": uploadPath}, "Image uploaded")
 }
 
-func (ctrl *BlogController) DeleteImage(c *fiber.Ctx) error {
-	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+func (c *BlogController) DeleteImage(ctx *fiber.Ctx) error {
+	id, err := strconv.ParseUint(ctx.Params("id"), 10, 32)
 	if err != nil {
-		return response.BadRequest(c, "Invalid blog ID")
+		return response.BadRequest(ctx, "Invalid blog ID")
 	}
 
-	userID := c.Locals("userID").(uint)
-	currentUser := c.Locals("user").(*models.User)
+	userID := ctx.Locals("userID").(uint)
+	user := ctx.Locals("user").(*models.User)
 
-	blog, err := ctrl.blogService.GetByID(uint(id))
+	blog, err := c.svc.GetByID(uint(id))
 	if err != nil {
-		return response.NotFound(c, "Blog not found")
+		return response.NotFound(ctx, "Blog not found")
 	}
 
-	if blog.UserID != userID && !currentUser.IsAdmin() {
-		return response.Forbidden(c, "You can only update your own blogs")
+	if blog.UserID != userID && !user.IsAdmin() {
+		return response.Forbidden(ctx, "You can only update your own blogs")
 	}
 
-	if err := ctrl.blogService.UpdateImage(uint(id), ""); err != nil {
-		return response.InternalError(c, "Failed to delete image")
+	if err := c.svc.UpdateImage(uint(id), ""); err != nil {
+		return response.InternalError(ctx, "Failed to delete image")
 	}
 
-	return response.Success(c, nil, "Image deleted successfully")
+	return response.Success(ctx, nil, "Image deleted")
 }

@@ -1,9 +1,7 @@
 package repositories
 
 import (
-	"context"
 	"gofiver/internal/models"
-	"sync"
 
 	"gorm.io/gorm"
 )
@@ -31,107 +29,43 @@ func (r *BlogRepository) FindByID(id uint) (*models.Blog, error) {
 	return &blog, nil
 }
 
-func (r *BlogRepository) FindAll(offset, limit int) ([]models.Blog, int64, error) {
+func (r *BlogRepository) FindAll(offset, limit int, search string) ([]models.Blog, error) {
 	var blogs []models.Blog
-	var total int64
-	var wg sync.WaitGroup
-	var countErr, queryErr error
-
-
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		countErr = r.db.Model(&models.Blog{}).Count(&total).Error
-	}()
-
-	go func() {
-		defer wg.Done()
-	
-		queryErr = r.db.
-			Select("blogs.id, blogs.title, blogs.image, blogs.user_id, blogs.created_at").
-			Joins("LEFT JOIN users ON users.id = blogs.user_id").
-			Preload("User", func(db *gorm.DB) *gorm.DB {
-				return db.Select("id, name")
-			}).
-			Order("blogs.id DESC").
-			Offset(offset).
-			Limit(limit).
-			Find(&blogs).Error
-	}()
-
-	wg.Wait()
-
-	if countErr != nil {
-		return nil, 0, countErr
-	}
-	if queryErr != nil {
-		return nil, 0, queryErr
-	}
-
-	return blogs, total, nil
-}
-
-func (r *BlogRepository) FindAllWithCachedCount(ctx context.Context, offset, limit int, cachedCount int64) ([]models.Blog, int64, error) {
-	var blogs []models.Blog
-
-	err := r.db.
-		Select("blogs.id, blogs.title, blogs.image, blogs.user_id, blogs.created_at").
+	query := r.db.Select("blogs.id, blogs.title, blogs.image, blogs.user_id, blogs.created_at").
 		Preload("User", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name")
 		}).
 		Order("blogs.id DESC").
 		Offset(offset).
-		Limit(limit).
-		Find(&blogs).Error
+		Limit(limit)
 
-	if err != nil {
-		return nil, 0, err
+	if search != "" {
+		query = query.Where("blogs.title LIKE ?", search+"%")
 	}
 
-	return blogs, cachedCount, nil
+	err := query.Find(&blogs).Error
+	return blogs, err
 }
 
-func (r *BlogRepository) GetCount() (int64, error) {
+func (r *BlogRepository) GetCount(search string) (int64, error) {
 	var count int64
-	err := r.db.Model(&models.Blog{}).Count(&count).Error
+	query := r.db.Model(&models.Blog{})
+	if search != "" {
+		query = query.Where("title LIKE ?", search+"%")
+	}
+	err := query.Count(&count).Error
 	return count, err
 }
 
-func (r *BlogRepository) FindByUserID(userID uint, offset, limit int) ([]models.Blog, int64, error) {
+func (r *BlogRepository) FindByUserID(userID uint, offset, limit int) ([]models.Blog, error) {
 	var blogs []models.Blog
-	var total int64
-	var wg sync.WaitGroup
-	var countErr, queryErr error
-
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		countErr = r.db.Model(&models.Blog{}).Where("user_id = ?", userID).Count(&total).Error
-	}()
-
-	go func() {
-		defer wg.Done()
-		queryErr = r.db.
-			Select("id, title, image, user_id, created_at").
-			Where("user_id = ?", userID).
-			Order("id DESC").
-			Offset(offset).
-			Limit(limit).
-			Find(&blogs).Error
-	}()
-
-	wg.Wait()
-
-	if countErr != nil {
-		return nil, 0, countErr
-	}
-	if queryErr != nil {
-		return nil, 0, queryErr
-	}
-
-	return blogs, total, nil
+	err := r.db.Select("id, title, image, user_id, created_at").
+		Where("user_id = ?", userID).
+		Order("id DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&blogs).Error
+	return blogs, err
 }
 
 func (r *BlogRepository) GetUserBlogCount(userID uint) (int64, error) {
@@ -154,43 +88,25 @@ func (r *BlogRepository) IsOwner(blogID, userID uint) bool {
 	return count > 0
 }
 
-func (r *BlogRepository) FindAllDeleted(offset, limit int) ([]models.Blog, int64, error) {
+func (r *BlogRepository) FindAllDeleted(offset, limit int) ([]models.Blog, error) {
 	var blogs []models.Blog
-	var total int64
-	var wg sync.WaitGroup
-	var countErr, queryErr error
+	err := r.db.Unscoped().
+		Select("blogs.id, blogs.title, blogs.image, blogs.user_id, blogs.created_at, blogs.deleted_at").
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, name")
+		}).
+		Where("blogs.deleted_at IS NOT NULL").
+		Order("blogs.deleted_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&blogs).Error
+	return blogs, err
+}
 
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		countErr = r.db.Unscoped().Model(&models.Blog{}).Where("deleted_at IS NOT NULL").Count(&total).Error
-	}()
-
-	go func() {
-		defer wg.Done()
-		queryErr = r.db.Unscoped().
-			Select("blogs.id, blogs.title, blogs.image, blogs.user_id, blogs.created_at, blogs.deleted_at").
-			Preload("User", func(db *gorm.DB) *gorm.DB {
-				return db.Select("id, name")
-			}).
-			Where("blogs.deleted_at IS NOT NULL").
-			Order("blogs.deleted_at DESC").
-			Offset(offset).
-			Limit(limit).
-			Find(&blogs).Error
-	}()
-
-	wg.Wait()
-
-	if countErr != nil {
-		return nil, 0, countErr
-	}
-	if queryErr != nil {
-		return nil, 0, queryErr
-	}
-
-	return blogs, total, nil
+func (r *BlogRepository) GetDeletedCount() (int64, error) {
+	var count int64
+	err := r.db.Unscoped().Model(&models.Blog{}).Where("deleted_at IS NOT NULL").Count(&count).Error
+	return count, err
 }
 
 func (r *BlogRepository) FindDeletedByID(id uint) (*models.Blog, error) {

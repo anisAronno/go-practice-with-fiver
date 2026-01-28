@@ -16,7 +16,7 @@ func RegisterRoutes(app *fiber.App, db *database.Database, redis *database.Redis
 	userRepo := repositories.NewUserRepository(db.DB)
 	blogRepo := repositories.NewBlogRepository(db.DB)
 
-	cacheService := services.NewCacheService(redis, &cfg.Cache)
+	cacheService := services.NewCacheService(redis, cfg.Cache.Enabled)
 
 	authService := services.NewAuthService(userRepo, cfg)
 	userService := services.NewUserService(userRepo)

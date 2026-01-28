@@ -48,8 +48,11 @@ export const userService = {
 }
 
 export const blogService = {
-  getAll: (page = 1, perPage = 15) =>
-    api.get<PaginatedResponse<Blog>>(`/blogs?page=${page}&per_page=${perPage}`),
+  getAll: (page = 1, perPage = 20, search = '') => {
+    const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+    if (search) params.append('search', search)
+    return api.get<PaginatedResponse<Blog>>(`/blogs?${params}`)
+  },
 
   getById: (id: number) => api.get<ApiResponse<Blog>>(`/blogs/${id}`),
 
@@ -61,13 +64,13 @@ export const blogService = {
 
   delete: (id: number) => api.delete<ApiResponse<null>>(`/blogs/${id}`),
 
-  getMyBlogs: (page = 1, perPage = 15) =>
+  getMyBlogs: (page = 1, perPage = 20) =>
     api.get<PaginatedResponse<Blog>>(`/blogs/my?page=${page}&per_page=${perPage}`),
 
-  getUserBlogs: (userId: number, page = 1, perPage = 15) =>
+  getUserBlogs: (userId: number, page = 1, perPage = 20) =>
     api.get<PaginatedResponse<Blog>>(`/users/${userId}/blogs?page=${page}&per_page=${perPage}`),
 
-  getTrashed: (page = 1, perPage = 15) =>
+  getTrashed: (page = 1, perPage = 20) =>
     api.get<PaginatedResponse<Blog>>(`/admin/blogs/trashed?page=${page}&per_page=${perPage}`),
 
   restore: (id: number) =>

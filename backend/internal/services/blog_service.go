@@ -10,248 +10,172 @@ import (
 )
 
 type BlogService struct {
-	blogRepo *repositories.BlogRepository
-	cache    *CacheService
+	repo  *repositories.BlogRepository
+	cache *CacheService
 }
 
-func NewBlogService(blogRepo *repositories.BlogRepository, cache *CacheService) *BlogService {
-	return &BlogService{
-		blogRepo: blogRepo,
-		cache:    cache,
-	}
+func NewBlogService(repo *repositories.BlogRepository, cache *CacheService) *BlogService {
+	return &BlogService{repo: repo, cache: cache}
 }
 
 func (s *BlogService) Create(userID uint, req *dto.CreateBlogRequest) (*models.Blog, error) {
-	blog := &models.Blog{
-		Title:   req.Title,
-		Content: req.Content,
-		UserID:  userID,
-	}
-
-	if err := s.blogRepo.Create(blog); err != nil {
+	blog := &models.Blog{Title: req.Title, Content: req.Content, UserID: userID}
+	if err := s.repo.Create(blog); err != nil {
 		return nil, err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	s.cache.InvalidateBlogCache(ctx)
-
-	return s.blogRepo.FindByID(blog.ID)
+	s.cache.InvalidateAll(ctx)
+	return s.repo.FindByID(blog.ID)
 }
 
-func (s *BlogService) GetAll(pagination *dto.PaginationQuery) ([]models.Blog, int64, error) {
-	offset := pagination.GetOffset()
-	limit := pagination.GetPerPage()
+func (s *BlogService) GetAll(q *dto.BlogSearchQuery) ([]CachedBlog, int64, error) {
+	offset := q.GetOffset()
+	limit := q.GetPerPage()
+	search := q.Search
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	cacheKey := s.cache.BlogListKey(offset, limit)
-	if cached, err := s.cache.GetCachedList(ctx, cacheKey); err == nil && cached != nil {
-
-		if blogs, ok := cached.Data.([]interface{}); ok {
-			result := make([]models.Blog, 0, len(blogs))
-			for _, b := range blogs {
-				if blogMap, ok := b.(map[string]interface{}); ok {
-					blog := mapToBlog(blogMap)
-					result = append(result, blog)
-				}
-			}
-			return result, cached.Total, nil
-		}
+	if cached, err := s.cache.GetBlogList(ctx, offset, limit, search); err == nil {
+		return cached.Blogs, cached.Total, nil
 	}
 
-	blogs, total, err := s.blogRepo.FindAll(offset, limit)
+	blogs, err := s.repo.FindAll(offset, limit, search)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	blogMaps := make([]map[string]interface{}, len(blogs))
-	for i, blog := range blogs {
-		blogMaps[i] = blog.ToListResponse()
+	var total int64
+	if search == "" {
+		if cachedCount, err := s.cache.GetTotalCount(ctx); err == nil {
+			total = cachedCount
+		} else {
+			total, _ = s.repo.GetCount("")
+			s.cache.SetTotalCount(ctx, total)
+		}
+	} else {
+		if len(blogs) < limit {
+			total = int64(offset + len(blogs))
+		} else {
+			total = int64(offset + limit + 1)
+		}
 	}
-	s.cache.SetCachedList(ctx, cacheKey, blogMaps, total)
 
-	return blogs, total, nil
+	result := make([]CachedBlog, len(blogs))
+	for i, b := range blogs {
+		result[i] = CachedBlog{
+			ID:        b.ID,
+			Title:     b.Title,
+			Image:     ptrToStr(b.Image),
+			UserID:    b.UserID,
+			UserName:  b.User.Name,
+			CreatedAt: b.CreatedAt.Format(time.RFC3339),
+		}
+	}
+
+	s.cache.SetBlogList(ctx, offset, limit, search, &CachedBlogList{Blogs: result, Total: total})
+	return result, total, nil
 }
 
-func mapToBlog(m map[string]interface{}) models.Blog {
-	blog := models.Blog{}
-	if id, ok := m["id"].(float64); ok {
-		blog.ID = uint(id)
+func ptrToStr(p *string) string {
+	if p == nil {
+		return ""
 	}
-	if title, ok := m["title"].(string); ok {
-		blog.Title = title
-	}
-	if image, ok := m["image"].(string); ok {
-		blog.Image = &image
-	}
-	if userID, ok := m["user_id"].(float64); ok {
-		blog.UserID = uint(userID)
-	}
-	if user, ok := m["user"].(map[string]interface{}); ok {
-		if uid, ok := user["id"].(float64); ok {
-			blog.User.ID = uint(uid)
-		}
-		if name, ok := user["name"].(string); ok {
-			blog.User.Name = name
-		}
-	}
-	return blog
+	return *p
 }
 
 func (s *BlogService) GetByID(id uint) (*models.Blog, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	cacheKey := s.cache.BlogDetailKey(id)
-	var cachedBlog models.Blog
-	if err := s.cache.GetCachedDetail(ctx, cacheKey, &cachedBlog); err == nil && cachedBlog.ID != 0 {
-		return &cachedBlog, nil
-	}
-
-	blog, err := s.blogRepo.FindByID(id)
-	if err != nil {
-		return nil, err
-	}
-
-	s.cache.SetCachedDetail(ctx, cacheKey, blog)
-
-	return blog, nil
+	return s.repo.FindByID(id)
 }
 
-func (s *BlogService) GetByUserID(userID uint, pagination *dto.PaginationQuery) ([]models.Blog, int64, error) {
-	offset := pagination.GetOffset()
-	limit := pagination.GetPerPage()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	cacheKey := s.cache.UserBlogListKey(userID, offset, limit)
-	if cached, err := s.cache.GetCachedList(ctx, cacheKey); err == nil && cached != nil {
-		if blogs, ok := cached.Data.([]interface{}); ok {
-			result := make([]models.Blog, 0, len(blogs))
-			for _, b := range blogs {
-				if blogMap, ok := b.(map[string]interface{}); ok {
-					blog := mapToBlog(blogMap)
-					result = append(result, blog)
-				}
-			}
-			return result, cached.Total, nil
-		}
-	}
-
-	blogs, total, err := s.blogRepo.FindByUserID(userID, offset, limit)
+func (s *BlogService) GetByUserID(userID uint, q *dto.PaginationQuery) ([]models.Blog, int64, error) {
+	blogs, err := s.repo.FindByUserID(userID, q.GetOffset(), q.GetPerPage())
 	if err != nil {
 		return nil, 0, err
 	}
-
-	blogMaps := make([]map[string]interface{}, len(blogs))
-	for i, blog := range blogs {
-		blogMaps[i] = blog.ToListResponse()
-	}
-	s.cache.SetCachedList(ctx, cacheKey, blogMaps, total)
-
+	total, _ := s.repo.GetUserBlogCount(userID)
 	return blogs, total, nil
 }
 
 func (s *BlogService) Update(id, userID uint, req *dto.UpdateBlogRequest, isAdmin bool) (*models.Blog, error) {
-	blog, err := s.blogRepo.FindByID(id)
+	blog, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, errors.New("blog not found")
 	}
-
 	if blog.UserID != userID && !isAdmin {
 		return nil, errors.New("unauthorized")
 	}
-
 	if req.Title != "" {
 		blog.Title = req.Title
 	}
 	if req.Content != "" {
 		blog.Content = req.Content
 	}
-
-	if err := s.blogRepo.Update(blog); err != nil {
+	if err := s.repo.Update(blog); err != nil {
 		return nil, err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	s.cache.InvalidateBlogDetail(ctx, id)
-	s.cache.InvalidateBlogCache(ctx)
-
+	s.cache.InvalidateAll(ctx)
 	return blog, nil
 }
 
 func (s *BlogService) Delete(id, userID uint, isAdmin bool) error {
-	blog, err := s.blogRepo.FindByID(id)
+	blog, err := s.repo.FindByID(id)
 	if err != nil {
 		return errors.New("blog not found")
 	}
-
 	if blog.UserID != userID && !isAdmin {
 		return errors.New("unauthorized")
 	}
-
-	err = s.blogRepo.Delete(id)
-	if err != nil {
+	if err := s.repo.Delete(id); err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	s.cache.InvalidateBlogCache(ctx)
-
+	s.cache.InvalidateAll(ctx)
 	return nil
 }
 
-func (s *BlogService) GetAllDeleted(pagination *dto.PaginationQuery) ([]models.Blog, int64, error) {
-	return s.blogRepo.FindAllDeleted(pagination.GetOffset(), pagination.GetPerPage())
+func (s *BlogService) GetAllDeleted(q *dto.PaginationQuery) ([]models.Blog, int64, error) {
+	blogs, err := s.repo.FindAllDeleted(q.GetOffset(), q.GetPerPage())
+	if err != nil {
+		return nil, 0, err
+	}
+	total, _ := s.repo.GetDeletedCount()
+	return blogs, total, nil
 }
 
 func (s *BlogService) Restore(id uint) error {
-	_, err := s.blogRepo.FindDeletedByID(id)
-	if err != nil {
+	if _, err := s.repo.FindDeletedByID(id); err != nil {
 		return errors.New("deleted blog not found")
 	}
-
-	err = s.blogRepo.Restore(id)
-	if err != nil {
+	if err := s.repo.Restore(id); err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	s.cache.InvalidateBlogCache(ctx)
-
+	s.cache.InvalidateAll(ctx)
 	return nil
 }
 
 func (s *BlogService) ForceDelete(id uint) error {
-	_, err := s.blogRepo.FindDeletedByID(id)
-	if err != nil {
+	if _, err := s.repo.FindDeletedByID(id); err != nil {
 		return errors.New("deleted blog not found")
 	}
-	return s.blogRepo.ForceDelete(id)
+	return s.repo.ForceDelete(id)
 }
 
 func (s *BlogService) UpdateImage(id uint, imagePath string) error {
-	blog, err := s.blogRepo.FindByID(id)
-	if err != nil {
+	if _, err := s.repo.FindByID(id); err != nil {
 		return errors.New("blog not found")
 	}
-	blog.Image = &imagePath
-
-	err = s.blogRepo.Update(blog)
-	if err != nil {
+	if err := s.repo.UpdateImage(id, imagePath); err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	s.cache.InvalidateBlogDetail(ctx, id)
-	s.cache.InvalidateBlogCache(ctx)
-
+	s.cache.InvalidateAll(ctx)
 	return nil
 }

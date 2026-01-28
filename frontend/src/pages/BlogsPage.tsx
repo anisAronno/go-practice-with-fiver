@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { blogService } from '../services'
 import type { Blog } from '../types'
-import { ChevronLeft, ChevronRight, Calendar, User } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, User, Search, X } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
@@ -17,15 +17,13 @@ export default function BlogsPage() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
 
-  useEffect(() => {
-    fetchBlogs()
-  }, [page])
-
-  const fetchBlogs = async () => {
+  const fetchBlogs = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await blogService.getAll(page)
+      const response = await blogService.getAll(page, 20, search)
       setBlogs(response.data.data || [])
       setTotalPages(response.data.meta?.total_pages || 1)
     } catch (error) {
@@ -33,33 +31,76 @@ export default function BlogsPage() {
     } finally {
       setLoading(false)
     }
+  }, [page, search])
+
+  useEffect(() => {
+    fetchBlogs()
+  }, [fetchBlogs])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== search) {
+        setSearch(searchInput)
+        setPage(1)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput, search])
+
+  const clearSearch = () => {
+    setSearchInput('')
+    setSearch('')
+    setPage(1)
   }
 
   const formatDate = (date: string) => new Date(date).toLocaleDateString()
 
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border overflow-hidden animate-pulse">
-            <div className="h-48 bg-gray-200" />
-            <div className="p-5 space-y-3">
-              <div className="h-6 bg-gray-200 rounded w-3/4" />
-              <div className="h-4 bg-gray-200 rounded w-1/2" />
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">All Blogs</h1>
+      <div className="flex flex-wrap gap-4 mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">All Blogs</h1>
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-4 text-gray-400" size={20} />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search blogs..."
+            className="w-full pl-10 pr-10 py-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+          {searchInput && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-3 top-4 text-gray-400 hover:text-red-600"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      </div>
 
-      {blogs.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border overflow-hidden animate-pulse">
+              <div className="h-48 bg-gray-200" />
+              <div className="p-5 space-y-3">
+                <div className="h-6 bg-gray-200 rounded w-3/4" />
+                <div className="h-4 bg-gray-200 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : blogs.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border">
-          <p className="text-gray-500">No blogs found</p>
+          <p className="text-gray-500">
+            {search ? `No blogs found for "${search}"` : 'No blogs found'}
+          </p>
+          {search && (
+            <button onClick={clearSearch} className="mt-4 text-indigo-600 hover:underline">
+              Clear search
+            </button>
+          )}
         </div>
       ) : (
         <>
