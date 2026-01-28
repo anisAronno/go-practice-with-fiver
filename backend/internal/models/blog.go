@@ -5,7 +5,7 @@ type Blog struct {
 	Title   string  `json:"title" gorm:"size:255;not null;index:idx_blog_title"`
 	Content string  `json:"content" gorm:"type:text;not null"`
 	Image   *string `json:"image" gorm:"size:500"`
-	UserID  uint    `json:"user_id" gorm:"not null;index:idx_blog_user_created,priority:1"`
+	UserID  uint    `json:"user_id" gorm:"not null;index:idx_blog_user_id;index:idx_blog_user_created,priority:1"`
 	User    User    `json:"user,omitempty" gorm:"foreignKey:UserID"`
 }
 

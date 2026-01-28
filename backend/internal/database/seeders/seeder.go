@@ -7,21 +7,18 @@ import (
 	"gorm.io/gorm"
 )
 
-// Seeder handles database seeding (like Laravel db:seed)
 type Seeder struct {
 	db *gorm.DB
 }
 
-// NewSeeder creates a new seeder
 func NewSeeder(db *gorm.DB) *Seeder {
 	return &Seeder{db: db}
 }
 
-// Run executes all seeders
 func (s *Seeder) Run() error {
 	log.Println("Running database seeders...")
 
-	// Check if already seeded
+
 	var count int64
 	s.db.Model(&models.User{}).Count(&count)
 	if count > 0 {
@@ -29,7 +26,7 @@ func (s *Seeder) Run() error {
 		return nil
 	}
 
-	// Run seeders
+
 	if err := s.seedUsers(); err != nil {
 		return err
 	}
@@ -72,7 +69,6 @@ func (s *Seeder) seedUsers() error {
 	return nil
 }
 
-// seedBlogs creates demo blogs
 func (s *Seeder) seedBlogs() error {
 	blogs := []struct {
 		Title   string

@@ -16,9 +16,11 @@ func RegisterRoutes(app *fiber.App, db *database.Database, redis *database.Redis
 	userRepo := repositories.NewUserRepository(db.DB)
 	blogRepo := repositories.NewBlogRepository(db.DB)
 
+	cacheService := services.NewCacheService(redis, &cfg.Cache)
+
 	authService := services.NewAuthService(userRepo, cfg)
 	userService := services.NewUserService(userRepo)
-	blogService := services.NewBlogService(blogRepo)
+	blogService := services.NewBlogService(blogRepo, cacheService)
 
 	authController := controllers.NewAuthController(authService)
 	userController := controllers.NewUserController(userService)
@@ -28,7 +30,6 @@ func RegisterRoutes(app *fiber.App, db *database.Database, redis *database.Redis
 
 	api := app.Group("/api")
 
-	// Health check
 	api.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"success": true,
@@ -37,16 +38,13 @@ func RegisterRoutes(app *fiber.App, db *database.Database, redis *database.Redis
 		})
 	})
 
-	// Public routes (no middleware)
 	api.Get("/blogs", blogController.Index)
 	api.Get("/blogs/:id", blogController.Show)
 	api.Get("/users/:id/blogs", blogController.UserBlogs)
 
-	// Guest-only auth routes (login/register) - blocks authenticated users
 	api.Post("/auth/register", middleware.GuestMiddleware(cfg), authController.Register)
 	api.Post("/auth/login", middleware.GuestMiddleware(cfg), authController.Login)
 
-	// Protected routes - requires authentication
 	auth := middleware.AuthMiddleware(cfg, userRepo)
 
 	api.Get("/auth/me", auth, authController.Me)
@@ -64,7 +62,6 @@ func RegisterRoutes(app *fiber.App, db *database.Database, redis *database.Redis
 	api.Post("/blogs/:id/image", auth, blogController.UploadImage)
 	api.Delete("/blogs/:id/image", auth, blogController.DeleteImage)
 
-	// Admin routes
 	adminAuth := []fiber.Handler{auth, middleware.AdminMiddleware()}
 
 	api.Get("/admin/blogs/trashed", append(adminAuth, blogController.Trashed)...)

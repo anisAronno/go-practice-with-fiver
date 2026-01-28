@@ -5,7 +5,6 @@ import LoadingSpinner from './LoadingSpinner'
 export default function GuestRoute() {
   const { isAuthenticated, _hasHydrated } = useAuthStore()
 
-  // Wait for Zustand to rehydrate from localStorage
   if (!_hasHydrated) {
     return <LoadingSpinner />
   }

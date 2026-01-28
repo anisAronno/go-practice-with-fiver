@@ -6,10 +6,10 @@ import (
 
 type User struct {
 	BaseModel
-	Name     string `json:"name" gorm:"size:255;not null"`
-	Email    string `json:"email" gorm:"size:255;uniqueIndex;not null"`
+	Name     string `json:"name" gorm:"size:255;not null;index:idx_user_name"`
+	Email    string `json:"email" gorm:"size:255;uniqueIndex:idx_user_email;not null"`
 	Password string `json:"-" gorm:"size:255;not null"`
-	Role     string `json:"role" gorm:"size:50;default:author"`
+	Role     string `json:"role" gorm:"size:50;default:author;index:idx_user_role"`
 	Blogs    []Blog `json:"blogs,omitempty" gorm:"foreignKey:UserID"`
 }
 

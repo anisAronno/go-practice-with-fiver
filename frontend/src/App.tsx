@@ -20,7 +20,6 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const refreshUser = async () => {
-      // Only verify token after hydration completes and we have auth
       if (!_hasHydrated) return
       
       if (token && isAuthenticated) {
@@ -30,7 +29,7 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
             setAuth(response.data.data, token)
           }
         } catch {
-          // Token invalid, clear auth
+  
           logout()
         }
       }

@@ -16,6 +16,20 @@ services:
       - common-net
       - gofiver-internal
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "${API_CPU_LIMIT:-1.0}"
+          memory: "${API_MEMORY_LIMIT:-512M}"
+        reservations:
+          cpus: "${API_CPU_RESERVATION:-0.25}"
+          memory: "${API_MEMORY_RESERVATION:-128M}"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   frontend:
     build:
@@ -29,6 +43,14 @@ services:
     networks:
       - gofiver-internal
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "${FRONTEND_CPU_LIMIT:-0.5}"
+          memory: "${FRONTEND_MEMORY_LIMIT:-256M}"
+        reservations:
+          cpus: "${FRONTEND_CPU_RESERVATION:-0.1}"
+          memory: "${FRONTEND_MEMORY_RESERVATION:-64M}"
 
   nginx:
     build:
@@ -45,6 +67,14 @@ services:
     networks:
       - gofiver-internal
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "${NGINX_CPU_LIMIT:-0.25}"
+          memory: "${NGINX_MEMORY_LIMIT:-64M}"
+        reservations:
+          cpus: "${NGINX_CPU_RESERVATION:-0.05}"
+          memory: "${NGINX_MEMORY_RESERVATION:-32M}"
 
 volumes:
   go-modules:

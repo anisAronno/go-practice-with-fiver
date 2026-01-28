@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthState>()(
         if (error) {
           console.error('Hydration error:', error)
         }
-        // Sync token to localStorage after hydration
+
         if (state?.token) {
           localStorage.setItem('token', state.token)
         }

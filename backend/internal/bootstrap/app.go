@@ -24,12 +24,19 @@ func NewApplication() (*Application, error) {
 	cfg := config.Load()
 
 	app := fiber.New(fiber.Config{
-		AppName:      cfg.App.Name,
-		ErrorHandler: customErrorHandler,
+		AppName:               cfg.App.Name,
+		ErrorHandler:          customErrorHandler,
+		DisableStartupMessage: cfg.App.Env == "production",
+		Prefork:               false,
+		ReduceMemoryUsage:     true, 
 	})
 
 	app.Use(recover.New())
-	app.Use(logger.New())
+
+	if cfg.App.Debug {
+		app.Use(logger.New())
+	}
+
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowMethods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
@@ -43,6 +50,10 @@ func NewApplication() (*Application, error) {
 
 	if err := db.AutoMigrate(); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
+	}
+
+	if err := db.CreateIndexes(); err != nil {
+		fmt.Printf("Warning: index creation had issues: %v\n", err)
 	}
 
 	redis, err := database.NewRedisClient(cfg.Redis)

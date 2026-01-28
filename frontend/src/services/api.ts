@@ -21,11 +21,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Only clear auth and redirect for explicit 401s on protected endpoints
-    // Don't redirect during initial page load or for public endpoints
     if (error.response?.status === 401) {
       const url = error.config?.url || ''
-      // Only redirect if accessing protected endpoints (not login/register/public)
+
       const isProtectedEndpoint = url.includes('/auth/me') || 
         url.includes('/blogs/my') ||
         url.includes('/dashboard') ||
